@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tormenta Ideas · Agente de Ideación Autónomo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0d0f14; --surface:#14171f; --panel:#1a1e28; --panel2:#1e2330;
+  --border:#252a38; --border2:#2e3448;
+  --accent:#6c63ff; --accent2:#00d4aa; --accent3:#ffd166; --warn:#ff6b6b;
+  --text:#e8eaf0; --muted:#7a8099; --muted2:#4a5068;
+  --mono:'JetBrains Mono','Fira Code',monospace;
+  --sans:'Inter',system-ui,sans-serif; --r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
+
+/* ── HEADER ── */
+header{padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.9rem;}
+.logo{width:38px;height:38px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;}
+header h1{font-size:1.2rem;font-weight:700;letter-spacing:-.02em;}
+header p{font-size:.72rem;color:var(--muted);margin-top:1px;}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:.75rem;}
+.lang-btns{display:flex;gap:2px;background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:2px;}
+.lang-btn{background:none;border:none;color:var(--muted);font-size:.72rem;padding:.22rem .5rem;border-radius:5px;cursor:pointer;font-weight:600;transition:all .15s;}
+.lang-btn.active{background:var(--accent);color:#fff;}
+.badge{font-size:.68rem;font-family:var(--mono);background:var(--panel);border:1px solid var(--border);padding:.2rem .55rem;border-radius:20px;color:var(--muted);}
+
+/* ── LAYOUT ── */
+.container{display:grid;grid-template-columns:320px 1fr;flex:1;min-height:0;overflow:hidden;}
+
+/* ── SIDEBAR ── */
+aside{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.aside-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 1rem;gap:0;}
+.aside-tab{padding:.6rem .75rem;font-size:.75rem;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px;}
+.aside-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.aside-pane{display:none;flex:1;overflow-y:auto;padding:1.1rem;flex-direction:column;gap:1rem;}
+.aside-pane.active{display:flex;}
+
+/* ── FORM FIELDS ── */
+.field label{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.4rem;font-weight:600;}
+.field input,.field textarea,.field select{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:var(--r);padding:.55rem .75rem;font-family:var(--sans);font-size:.82rem;transition:border-color .2s;outline:none;resize:none;}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent);}
+.field textarea{height:72px;line-height:1.5;}
+input[type="password"]{font-family:var(--mono);letter-spacing:.05em;}
+.key-row{display:flex;gap:.4rem;}
+.key-row input{flex:1;}
+.key-toggle{background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:var(--r);padding:0 .65rem;cursor:pointer;font-size:.75rem;white-space:nowrap;transition:all .15s;}
+.key-toggle:hover{color:var(--text);border-color:var(--accent);}
+.key-saved{font-size:.65rem;color:var(--accent2);margin-top:.25rem;display:none;}
+
+.range-row{display:flex;align-items:center;gap:.65rem;margin-top:.4rem;}
+.range-row input[type="range"]{flex:1;accent-color:var(--accent);background:transparent;border:none;padding:0;}
+.range-val{font-family:var(--mono);font-size:.82rem;color:var(--accent);min-width:18px;text-align:right;}
+
+/* ── AGENTS CONFIG ── */
+.agent-config{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.agent-row{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;}
+.agent-row:last-child{border-bottom:none;}
+.agent-row:hover{background:var(--panel2);}
+.agent-dot{width:7px;height:7px;border-radius:50%;background:var(--muted2);flex-shrink:0;transition:all .3s;}
+.agent-row.active .agent-dot{background:var(--accent2);box-shadow:0 0 6px var(--accent2);}
+.agent-row.working .agent-dot{background:var(--accent);box-shadow:0 0 6px var(--accent);animation:pulse .8s infinite;}
+.agent-name{font-size:.78rem;flex:1;}
+.agent-edit-btn{font-size:.65rem;color:var(--muted2);background:none;border:none;cursor:pointer;padding:.1rem .3rem;border-radius:4px;transition:color .15s;}
+.agent-edit-btn:hover{color:var(--accent);}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;width:min(540px,95vw);padding:1.5rem;display:flex;flex-direction:column;gap:1rem;}
+.modal h3{font-size:.95rem;font-weight:600;}
+.modal textarea{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:var(--r);padding:.75rem;font-family:var(--mono);font-size:.75rem;height:200px;resize:vertical;outline:none;line-height:1.6;}
+.modal textarea:focus{border-color:var(--accent);}
+.modal-btns{display:flex;gap:.75rem;justify-content:flex-end;}
+.btn-sm{padding:.45rem .9rem;border-radius:7px;font-size:.8rem;cursor:pointer;border:1px solid var(--border);background:var(--panel);color:var(--muted);transition:all .15s;}
+.btn-sm:hover{color:var(--text);border-color:var(--accent);}
+.btn-sm.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn-sm.primary:hover{opacity:.88;}
+
+/* ── PROGRESS / COST ── */
+.progress-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0;transition:width .4s ease;}
+.cost-row{display:flex;justify-content:space-between;font-size:.7rem;font-family:var(--mono);color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:.35rem .65rem;}
+.cost-row span:last-child{color:var(--accent2);}
+
+/* ── BUTTONS ── */
+.btn-run{width:100%;background:linear-gradient(135deg,var(--accent),#8b5cf6);border:none;border-radius:var(--r);color:#fff;font-size:.88rem;font-weight:600;padding:.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;transition:opacity .2s,transform .1s;}
+.btn-run:hover:not(:disabled){opacity:.88;transform:translateY(-1px);}
+.btn-run:disabled{opacity:.42;cursor:not-allowed;transform:none;}
+.btn-ghost{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:var(--r);padding:.55rem;font-size:.78rem;cursor:pointer;transition:all .15s;}
+.btn-ghost:hover{color:var(--text);border-color:var(--accent);}
+.info-note{display:flex;align-items:flex-start;gap:.5rem;font-size:.7rem;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;line-height:1.5;}
+
+/* ── HISTORY LIST ── */
+.history-item{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:.65rem .8rem;cursor:pointer;transition:border-color .15s;}
+.history-item:hover{border-color:var(--accent);}
+.history-item h4{font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.history-item p{font-size:.68rem;color:var(--muted);margin-top:.2rem;}
+.history-empty{font-size:.78rem;color:var(--muted);text-align:center;padding:1.5rem 0;}
+
+/* ── MAIN ── */
+main{display:flex;flex-direction:column;overflow:hidden;}
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 1.25rem;gap:0;}
+.tab{padding:.65rem .9rem;font-size:.78rem;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px;}
+.tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.tab:hover:not(.active){color:var(--text);}
+.tab-content{display:none;flex:1;overflow-y:auto;padding:1.25rem;flex-direction:column;gap:1rem;}
+.tab-content.active{display:flex;}
+
+/* ── STREAM LOG ── */
+.stream-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);font-family:var(--mono);font-size:.75rem;line-height:1.75;padding:.9rem 1.1rem;flex:1;overflow-y:auto;min-height:300px;color:#c8cad8;white-space:pre-wrap;word-break:break-word;}
+.stream-panel .ph{color:var(--accent);font-weight:700;}
+.stream-panel .ag{color:var(--accent2);}
+.stream-panel .sc{color:var(--accent3);}
+.stream-panel .er{color:var(--warn);}
+.stream-panel .ok{color:#4ade80;}
+.stream-cursor{display:inline-block;width:8px;height:.85em;background:var(--accent);animation:blink .7s infinite;vertical-align:text-bottom;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;height:100%;color:var(--muted);text-align:center;min-height:220px;}
+.empty-state .icon{font-size:2.2rem;opacity:.35;}
+
+/* ── IDEA CARDS ── */
+.ideas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.85rem;}
+.idea-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1rem;display:flex;flex-direction:column;gap:.45rem;transition:border-color .2s,transform .15s;}
+.idea-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.idea-card .meta{font-size:.62rem;font-family:var(--mono);color:var(--muted);display:flex;gap:.5rem;}
+.idea-card h3{font-size:.85rem;font-weight:600;line-height:1.4;}
+.idea-card p{font-size:.75rem;color:var(--muted);line-height:1.55;flex:1;}
+.scores-mini{display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.2rem;}
+.score-pill{font-size:.62rem;font-family:var(--mono);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:.12rem .4rem;display:flex;gap:.25rem;}
+.score-pill .sl{color:var(--muted);}
+.score-pill .sv{color:var(--accent2);}
+.winner-badge{background:linear-gradient(135deg,rgba(255,209,102,.15),rgba(255,209,102,.05));border-color:rgba(255,209,102,.4);}
+.winner-badge::before{content:'🏆 ';font-size:.75rem;}
+
+/* ── RANKING TABLE ── */
+.rank-table{width:100%;border-collapse:collapse;font-size:.78rem;}
+.rank-table th{text-align:left;padding:.5rem .75rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;}
+.rank-table td{padding:.55rem .75rem;border-bottom:1px solid var(--border);vertical-align:middle;}
+.rank-table tr:last-child td{border-bottom:none;}
+.rank-table tr:hover td{background:var(--panel2);}
+.rank-num{font-family:var(--mono);font-weight:700;color:var(--muted);}
+.rank-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;min-width:60px;}
+.rank-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+
+/* ── CHART ── */
+.chart-wrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem;max-width:480px;margin:0 auto;}
+.chart-wrap h3{font-size:.8rem;color:var(--muted);text-align:center;margin-bottom:.9rem;}
+
+/* ── EXPORT BAR ── */
+.export-bar{display:flex;gap:.6rem;flex-wrap:wrap;padding:.9rem 1.25rem;border-top:1px solid var(--border);}
+.btn-export{background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:.42rem .85rem;font-size:.75rem;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:.35rem;}
+.btn-export:hover:not(:disabled){color:var(--text);border-color:var(--accent);}
+.btn-export:disabled{opacity:.32;cursor:not-allowed;}
+
+/* ── ANIMATIONS ── */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.idea-card{animation:fadeIn .25s ease both;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+@media(max-width:768px){.container{grid-template-columns:1fr;}aside{border-right:none;border-bottom:1px solid var(--border);max-height:55vh;}}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">⚡</div>
+  <div>
+    <h1>Tormenta Ideas <span style="font-weight:400;opacity:.5;font-size:.85em">v2</span></h1>
+    <p data-i18n="subtitle">Agente de ideación autónomo · Inventos multi-agente</p>
+  </div>
+  <div class="header-right">
+    <div class="lang-btns">
+      <button class="lang-btn active" onclick="setLang('es')">ES</button>
+      <button class="lang-btn" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" onclick="setLang('val')">VAL</button>
+    </div>
+    <span class="badge">gpt-4o-mini</span>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- ── SIDEBAR ── -->
+<aside>
+  <div class="aside-tabs">
+    <div class="aside-tab active" onclick="switchSideTab('config')" data-i18n="tab_config">Configurar</div>
+    <div class="aside-tab" onclick="switchSideTab('agents')" data-i18n="tab_agents">Agentes</div>
+    <div class="aside-tab" onclick="switchSideTab('history')" data-i18n="tab_history">Historial</div>
+  </div>
+
+  <!-- CONFIG PANE -->
+  <div class="aside-pane active" id="pane-config">
+    <div class="field">
+      <label data-i18n="lbl_apikey">🔑 OpenAI API Key</label>
+      <div class="key-row">
+        <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" oninput="onKeyInput()">
+        <button class="key-toggle" id="keyToggle" onclick="toggleKey()">👁</button>
+      </div>
+      <div class="key-saved" id="keySaved" data-i18n="key_saved">✓ Guardada localmente (cifrada)</div>
+    </div>
+
+    <div class="field">
+      <label data-i18n="lbl_problem">💡 <span data-i18n="lbl_problem_text">Problema / Necesidad</span></label>
+      <textarea id="problem" data-i18n-ph="ph_problem"></textarea>
+    </div>
+
+    <div class="field">
+      <label data-i18n="lbl_domain">🏷 <span data-i18n="lbl_domain_text">Dominio</span></label>
+      <input type="text" id="domain" data-i18n-ph="ph_domain">
+    </div>
+
+    <div class="field">
+      <label data-i18n="lbl_audience">🎯 <span data-i18n="lbl_audience_text">Público objetivo</span></label>
+      <input type="text" id="audience" data-i18n-ph="ph_audience">
+    </div>
+
+    <div class="field">
+      <label data-i18n="lbl_rounds">🔄 <span data-i18n="lbl_rounds_text">Rondas de iteración</span></label>
+      <div class="range-row">
+        <input type="range" id="rounds" min="1" max="5" value="2" oninput="document.getElementById('roundsVal').textContent=this.value">
+        <span class="range-val" id="roundsVal">2</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label data-i18n="lbl_ideas">💡 <span data-i18n="lbl_ideas_text">Ideas por ronda</span></label>
+      <div class="range-row">
+        <input type="range" id="ideasN" min="1" max="5" value="2" oninput="document.getElementById('ideasVal').textContent=this.value">
+        <span class="range-val" id="ideasVal">2</span>
+      </div>
+    </div>
+
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="cost-row">
+      <span data-i18n="tokens_used">Tokens usados</span>
+      <span id="tokenCount">—</span>
+    </div>
+
+    <button class="btn-run" id="btnRun" onclick="runGenia()">
+      <span id="btnIcon">▶</span><span id="btnLabel" data-i18n="btn_start">Iniciar Tormenta</span>
+    </button>
+    <button class="btn-ghost" onclick="resetAll()" data-i18n="btn_reset">Limpiar sesión</button>
+    <div class="info-note">🔒 <span data-i18n="privacy_note">Tu API Key se cifra en localStorage. Las llamadas van directas a OpenAI desde tu navegador.</span></div>
+  </div>
+
+  <!-- AGENTS PANE -->
+  <div class="aside-pane" id="pane-agents">
+    <div style="font-size:.72rem;color:var(--muted)" data-i18n="agents_hint">Haz clic en ✏ para editar el system prompt de cada agente.</div>
+    <div class="agent-config" id="agentConfig"></div>
+  </div>
+
+  <!-- HISTORY PANE -->
+  <div class="aside-pane" id="pane-history">
+    <div style="font-size:.72rem;color:var(--muted)" data-i18n="history_hint">Sesiones anteriores guardadas en IndexedDB.</div>
+    <div id="historyList"></div>
+    <button class="btn-ghost" onclick="clearHistory()" data-i18n="btn_clear_history">Borrar historial</button>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<main>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('log')" data-i18n="tab_log">📡 Proceso</div>
+    <div class="tab" onclick="switchTab('ideas')" data-i18n="tab_ideas">💡 Ideas</div>
+    <div class="tab" onclick="switchTab('ranking')" data-i18n="tab_ranking">🎯 Ranking</div>
+    <div class="tab" onclick="switchTab('radar')" data-i18n="tab_radar">📊 Radar</div>
+  </div>
+
+  <div class="tab-content active" id="tab-log">
+    <div class="stream-panel" id="streamPanel">
+      <div class="empty-state"><div class="icon">⚡</div><div data-i18n="empty_log">Configura el problema y pulsa Iniciar Tormenta</div></div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-ideas">
+    <div id="ideasGrid" class="ideas-grid">
+      <div class="empty-state" style="grid-column:1/-1"><div class="icon">💡</div><div data-i18n="empty_ideas">Las ideas aparecerán aquí</div></div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-ranking">
+    <div class="table-wrap">
+      <table class="rank-table">
+        <thead><tr>
+          <th>#</th>
+          <th data-i18n="col_title">Título</th>
+          <th data-i18n="col_quality">Calidad</th>
+          <th data-i18n="col_orig">Original.</th>
+          <th data-i18n="col_pract">Práct.</th>
+          <th data-i18n="col_impact">Impacto</th>
+          <th data-i18n="col_avg">Media</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="rankBody">
+          <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem;font-size:.78rem" data-i18n="empty_ranking">Sin datos aún</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-radar">
+    <div class="chart-wrap">
+      <h3 data-i18n="radar_title">Puntuación media de todas las ideas</h3>
+      <canvas id="radarChart" width="440" height="360"></canvas>
+    </div>
+  </div>
+
+  <div class="export-bar">
+    <button class="btn-export" id="bJSON" onclick="exportJSON()" disabled>⬇ JSON</button>
+    <button class="btn-export" id="bCSV"  onclick="exportCSV()"  disabled>⬇ CSV</button>
+    <button class="btn-export" id="bMD"   onclick="exportMD()"   disabled>⬇ Markdown</button>
+    <button class="btn-export" id="bDOCX" onclick="exportDOCX()" disabled>⬇ Word</button>
+    <button class="btn-export" id="bCopy" onclick="copyAll()"    disabled>📋 <span data-i18n="btn_copy">Copiar</span></button>
+  </div>
+</main>
+</div>
+
+<!-- ── AGENT EDIT MODAL ── -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">Editar agente</h3>
+    <div style="font-size:.72rem;color:var(--muted);margin-bottom:.25rem" data-i18n="modal_hint">System prompt enviado a gpt-4o-mini para este agente.</div>
+    <textarea id="modalPrompt"></textarea>
+    <div class="modal-btns">
+      <button class="btn-sm" onclick="closeModal()" data-i18n="btn_cancel">Cancelar</button>
+      <button class="btn-sm primary" onclick="savePrompt()" data-i18n="btn_save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// i18n
+// ═══════════════════════════════════════════════════════
+const LANGS = {
+  es:{
+    subtitle:'Agente de ideación autónomo · Inventos multi-agente',
+    tab_config:'Configurar',tab_agents:'Agentes',tab_history:'Historial',
+    lbl_apikey:'🔑 OpenAI API Key',lbl_problem_text:'Problema / Necesidad',
+    lbl_domain_text:'Dominio',lbl_audience_text:'Público objetivo',
+    lbl_rounds_text:'Rondas de iteración',lbl_ideas_text:'Ideas por ronda',
+    ph_problem:'Ej: Los adolescentes con TDAH necesitan herramientas de juego que ayuden a socializar...',
+    ph_domain:'Ej: Salud mental, EdTech, Sostenibilidad...',
+    ph_audience:'Ej: Adolescentes 12–17 años',
+    key_saved:'✓ Guardada localmente (cifrada)',
+    tokens_used:'Tokens usados',btn_start:'Iniciar Tormenta',btn_reset:'Limpiar sesión',
+    privacy_note:'Tu API Key se cifra en localStorage. Las llamadas van directas a OpenAI.',
+    agents_hint:'Haz clic en ✏ para editar el system prompt de cada agente.',
+    history_hint:'Sesiones anteriores guardadas en IndexedDB.',
+    btn_clear_history:'Borrar historial',
+    tab_log:'📡 Proceso',tab_ideas:'💡 Ideas',tab_ranking:'🎯 Ranking',tab_radar:'📊 Radar',
+    empty_log:'Configura el problema y pulsa Iniciar Tormenta',
+    empty_ideas:'Las ideas aparecerán aquí',empty_ranking:'Sin datos aún',
+    radar_title:'Puntuación media de todas las ideas',
+    col_title:'Título',col_quality:'Calidad',col_orig:'Original.',col_pract:'Práct.',col_impact:'Impacto',col_avg:'Media',
+    modal_hint:'System prompt enviado a gpt-4o-mini para este agente.',
+    btn_cancel:'Cancelar',btn_save:'Guardar',btn_copy:'Copiar',
+    score_keys:['Calidad','Originalidad','Practicidad','Impacto','Alineamiento','Estética'],
+  },
+  en:{
+    subtitle:'Autonomous ideation agent · Multi-agent inventions',
+    tab_config:'Configure',tab_agents:'Agents',tab_history:'History',
+    lbl_apikey:'🔑 OpenAI API Key',lbl_problem_text:'Problem / Need',
+    lbl_domain_text:'Domain',lbl_audience_text:'Target audience',
+    lbl_rounds_text:'Iteration rounds',lbl_ideas_text:'Ideas per round',
+    ph_problem:'E.g. Teenagers with ADHD need play tools that help them socialise...',
+    ph_domain:'E.g. Mental health, EdTech, Sustainability...',
+    ph_audience:'E.g. Teenagers 12–17 with ADHD',
+    key_saved:'✓ Saved locally (encrypted)',
+    tokens_used:'Tokens used',btn_start:'Start Brainstorm',btn_reset:'Clear session',
+    privacy_note:'Your API Key is encrypted in localStorage. Calls go directly to OpenAI.',
+    agents_hint:'Click ✏ to edit the system prompt for each agent.',
+    history_hint:'Previous sessions saved in IndexedDB.',
+    btn_clear_history:'Clear history',
+    tab_log:'📡 Process',tab_ideas:'💡 Ideas',tab_ranking:'🎯 Ranking',tab_radar:'📊 Radar',
+    empty_log:'Configure the problem and click Start Brainstorm',
+    empty_ideas:'Ideas will appear here',empty_ranking:'No data yet',
+    radar_title:'Average score of all ideas',
+    col_title:'Title',col_quality:'Quality',col_orig:'Originality',col_pract:'Practicality',col_impact:'Impact',col_avg:'Average',
+    modal_hint:'System prompt sent to gpt-4o-mini for this agent.',
+    btn_cancel:'Cancel',btn_save:'Save',btn_copy:'Copy',
+    score_keys:['Quality','Originality','Practicality','Impact','Alignment','Aesthetics'],
+  },
+  val:{
+    subtitle:'Agent d\'ideació autònom · Invencions multi-agent',
+    tab_config:'Configurar',tab_agents:'Agents',tab_history:'Historial',
+    lbl_apikey:'🔑 Clau API OpenAI',lbl_problem_text:'Problema / Necessitat',
+    lbl_domain_text:'Domini',lbl_audience_text:'Públic objectiu',
+    lbl_rounds_text:'Rondes d\'iteració',lbl_ideas_text:'Idees per ronda',
+    ph_problem:'Ex: Els adolescents amb TDAH necessiten eines de joc que els ajuden a socialitzar...',
+    ph_domain:'Ex: Salut mental, EdTech, Sostenibilitat...',
+    ph_audience:'Ex: Adolescents 12–17 anys',
+    key_saved:'✓ Guardada localment (xifrada)',
+    tokens_used:'Tokens usats',btn_start:'Iniciar Tormenta',btn_reset:'Netejar sessió',
+    privacy_note:'La teua clau API es xifra a localStorage. Les crides van directes a OpenAI.',
+    agents_hint:'Fes clic a ✏ per editar el system prompt de cada agent.',
+    history_hint:'Sessions anteriors guardades a IndexedDB.',
+    btn_clear_history:'Esborrar historial',
+    tab_log:'📡 Procés',tab_ideas:'💡 Idees',tab_ranking:'🎯 Rànquing',tab_radar:'📊 Radar',
+    empty_log:'Configura el problema i polsa Iniciar Tormenta',
+    empty_ideas:'Les idees apareixeran aquí',empty_ranking:'Sense dades encara',
+    radar_title:'Puntuació mitjana de totes les idees',
+    col_title:'Títol',col_quality:'Qualitat',col_orig:'Original.',col_pract:'Pràct.',col_impact:'Impacte',col_avg:'Mitjana',
+    modal_hint:'System prompt enviat a gpt-4o-mini per a aquest agent.',
+    btn_cancel:'Cancel·lar',btn_save:'Guardar',btn_copy:'Copiar',
+    score_keys:['Qualitat','Originalitat','Practicitat','Impacte','Alineament','Estètica'],
+  }
+};
+let lang = 'es';
+function t(k){ return LANGS[lang][k] || LANGS.es[k] || k; }
+function setLang(l){
+  lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.textContent===l.toUpperCase()));
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k=el.getAttribute('data-i18n'); if(LANGS[l][k]) el.textContent=LANGS[l][k];
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{
+    const k=el.getAttribute('data-i18n-ph'); if(LANGS[l][k]) el.placeholder=LANGS[l][k];
+  });
+  // update agent prompts to current language
+  rebuildAgentPrompts();
+  renderAgentConfig();
+}
+
+// ═══════════════════════════════════════════════════════
+// AGENTS DEFAULT PROMPTS
+// ═══════════════════════════════════════════════════════
+function getDefaultPrompts(){
+  const sk = t('score_keys');
+  return [
+    {id:'creator',  icon:'🎨', name:{es:'Creador',en:'Creator',val:'Creador'},
+      prompt:`You are a creative innovation expert generating ${lang==='en'?'disruptive':'disruptivas'} product/service ideas.
+For each idea include: short title, 3-4 line description, key advantages.
+Separate ideas with "---". Be specific and practical.`},
+    {id:'critic',   icon:'🔬', name:{es:'Crítico',en:'Critic',val:'Crític'},
+      prompt:`You are a constructive innovation critic. Analyse product ideas and identify specific weaknesses, risks and concrete improvements. Be specific, not destructive.`},
+    {id:'synth',    icon:'⚗️',  name:{es:'Sintetizador',en:'Synthesiser',val:'Sintetitzador'},
+      prompt:`You are a synthesiser. Take original ideas and critiques and produce improved versions incorporating the identified improvement points. Format: title, improved description. Separate with "---".`},
+    {id:'scorer',   icon:'📐', name:{es:'Evaluador',en:'Evaluator',val:'Avaluador'},
+      prompt:`You are an expert evaluator. For each idea score from 0 to 10: ${sk.join(', ')}.
+Format exactly: "${sk[0]}: 8, ${sk[1]}: 7, ${sk[2]}: 9, ${sk[3]}: 8, ${sk[4]}: 7, ${sk[5]}: 8" per idea.`},
+    {id:'refiner',  icon:'💎', name:{es:'Refinador',en:'Refiner',val:'Refinador'},
+      prompt:`You are a product refiner. Take the highest-scoring idea and develop a detailed version with: value proposition, key features, basic implementation plan, and potential risks.`},
+    {id:'ranker',   icon:'🏆', name:{es:'Ranker',en:'Ranker',val:'Ranker'},
+      prompt:`You are an innovation jury. From all ideas presented, select the most promising one and justify your choice in 3-4 lines. State the exact title.`},
+  ];
+}
+
+let agentPrompts = {};
+function rebuildAgentPrompts(){
+  const defaults = getDefaultPrompts();
+  defaults.forEach(a=>{ if(!agentPrompts[a.id]) agentPrompts[a.id]=a.prompt; });
+}
+rebuildAgentPrompts();
+
+function renderAgentConfig(){
+  const defaults = getDefaultPrompts();
+  const container = document.getElementById('agentConfig');
+  container.innerHTML = '';
+  defaults.forEach(a=>{
+    const div = document.createElement('div');
+    div.className = 'agent-row'; div.id = 'agent-'+a.id;
+    div.innerHTML=`<span class="agent-dot"></span><span style="font-size:.9rem">${a.icon}</span><span class="agent-name">${a.name[lang]||a.name.es}</span><button class="agent-edit-btn" onclick="openModal('${a.id}','${a.name[lang]||a.name.es}')">✏</button>`;
+    container.appendChild(div);
+  });
+}
+renderAgentConfig();
+
+// ═══════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════
+let editingAgent = null;
+function openModal(id, name){
+  editingAgent = id;
+  document.getElementById('modalTitle').textContent = `${t('tab_agents')}: ${name}`;
+  document.getElementById('modalPrompt').value = agentPrompts[id] || getDefaultPrompts().find(a=>a.id===id)?.prompt || '';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+function savePrompt(){
+  agentPrompts[editingAgent] = document.getElementById('modalPrompt').value;
+  closeModal();
+}
+document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
+
+// ═══════════════════════════════════════════════════════
+// API KEY — AES-GCM ENCRYPT / DECRYPT in localStorage
+// ═══════════════════════════════════════════════════════
+const KEY_STORE = 'genia_key_v2';
+const SALT = 'genia-salt-umh-2026';
+
+async function deriveKey(){
+  const enc = new TextEncoder();
+  const keyMat = await crypto.subtle.importKey('raw',enc.encode(SALT),{name:'PBKDF2'},false,['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2',salt:enc.encode('genia'),iterations:100000,hash:'SHA-256'},
+    keyMat,{name:'AES-GCM',length:256},false,['encrypt','decrypt']
+  );
+}
+async function saveKey(raw){
+  try{
+    const key=await deriveKey();
+    const iv=crypto.getRandomValues(new Uint8Array(12));
+    const enc=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(raw));
+    const payload={iv:Array.from(iv),data:Array.from(new Uint8Array(enc))};
+    localStorage.setItem(KEY_STORE,JSON.stringify(payload));
+  }catch(e){console.warn('Key save failed',e);}
+}
+async function loadKey(){
+  try{
+    const raw=localStorage.getItem(KEY_STORE); if(!raw) return null;
+    const {iv,data}=JSON.parse(raw);
+    const key=await deriveKey();
+    const dec=await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(iv)},key,new Uint8Array(data));
+    return new TextDecoder().decode(dec);
+  }catch(e){return null;}
+}
+async function onKeyInput(){
+  const v=document.getElementById('apiKey').value.trim();
+  if(v.startsWith('sk-')&&v.length>20){ await saveKey(v); document.getElementById('keySaved').style.display='block'; }
+  else document.getElementById('keySaved').style.display='none';
+}
+function toggleKey(){
+  const i=document.getElementById('apiKey');
+  i.type=i.type==='password'?'text':'password';
+}
+// Load key on start
+(async()=>{
+  const k=await loadKey();
+  if(k){ document.getElementById('apiKey').value=k; document.getElementById('keySaved').style.display='block'; }
+})();
+
+// ═══════════════════════════════════════════════════════
+// INDEXEDDB — SESSION HISTORY
+// ═══════════════════════════════════════════════════════
+let db;
+function openDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open('genia_db',1);
+    req.onupgradeneeded=e=>e.target.result.createObjectStore('sessions',{keyPath:'id',autoIncrement:true});
+    req.onsuccess=e=>{db=e.target.result;res(db);};
+    req.onerror=()=>rej(req.error);
+  });
+}
+async function saveSession(session){
+  if(!db)await openDB();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction('sessions','readwrite');
+    tx.objectStore('sessions').add(session);
+    tx.oncomplete=res; tx.onerror=rej;
+  });
+}
+async function loadSessions(){
+  if(!db)await openDB();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction('sessions','readonly');
+    const req=tx.objectStore('sessions').getAll();
+    req.onsuccess=()=>res(req.result.reverse());
+    req.onerror=rej;
+  });
+}
+async function clearAllSessions(){
+  if(!db)await openDB();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction('sessions','readwrite');
+    tx.objectStore('sessions').clear();
+    tx.oncomplete=res; tx.onerror=rej;
+  });
+}
+async function renderHistory(){
+  const sessions=await loadSessions().catch(()=>[]);
+  const el=document.getElementById('historyList');
+  if(!sessions.length){el.innerHTML=`<div class="history-empty" data-i18n="empty_ranking">${t('empty_ranking')}</div>`;return;}
+  el.innerHTML='';
+  sessions.slice(0,15).forEach(s=>{
+    const d=document.createElement('div'); d.className='history-item';
+    const date=new Date(s.ts).toLocaleDateString(lang==='en'?'en-GB':'es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    d.innerHTML=`<h4>${s.problem.slice(0,50)}${s.problem.length>50?'…':''}</h4><p>${date} · ${s.ideas?.length||0} ideas</p>`;
+    d.onclick=()=>restoreSession(s);
+    el.appendChild(d);
+  });
+}
+function restoreSession(s){
+  allIdeas=s.ideas||[];
+  document.getElementById('problem').value=s.problem||'';
+  renderAllIdeas(); renderRanking(); updateRadar();
+  switchTab('ideas'); switchSideTab('config');
+  log(`<span class="ok">✓ Sesión restaurada: ${s.problem.slice(0,40)}</span>`);
+}
+async function clearHistory(){
+  await clearAllSessions(); renderHistory();
+}
+openDB().then(()=>renderHistory());
+
+// ═══════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['log','ideas','ranking','radar'][i]===id));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+id));
+}
+function switchSideTab(id){
+  document.querySelectorAll('.aside-tab').forEach((el,i)=>el.classList.toggle('active',['config','agents','history'][i]===id));
+  document.querySelectorAll('.aside-pane').forEach(c=>c.classList.toggle('active',c.id==='pane-'+id));
+  if(id==='history') renderHistory();
+}
+function setAgentState(id,state){
+  const r=document.getElementById('agent-'+id); if(!r) return;
+  r.className='agent-row '+(state||'');
+}
+function setProgress(pct){ document.getElementById('progressFill').style.width=pct+'%'; }
+let totalTokens=0;
+function addTokens(n){ totalTokens+=n; document.getElementById('tokenCount').textContent=totalTokens.toLocaleString(); }
+
+let streamCursor=null;
+function log(html,stream=false){
+  const p=document.getElementById('streamPanel');
+  if(p.querySelector('.empty-state')) p.innerHTML='';
+  if(stream){
+    if(!streamCursor){ streamCursor=document.createElement('span'); streamCursor.innerHTML='<span class="stream-cursor"></span>'; p.appendChild(streamCursor); }
+    streamCursor.innerHTML=html+'<span class="stream-cursor"></span>';
+  } else {
+    if(streamCursor){p.removeChild(streamCursor);streamCursor=null;}
+    p.innerHTML+=html+'\n';
+  }
+  p.scrollTop=p.scrollHeight;
+}
+function logFlush(html){ if(streamCursor){document.getElementById('streamPanel').removeChild(streamCursor);streamCursor=null;} log(html); }
+
+function resetAll(){
+  allIdeas=[]; totalTokens=0;
+  document.getElementById('streamPanel').innerHTML=`<div class="empty-state"><div class="icon">⚡</div><div>${t('empty_log')}</div></div>`;
+  document.getElementById('ideasGrid').innerHTML=`<div class="empty-state" style="grid-column:1/-1"><div class="icon">💡</div><div>${t('empty_ideas')}</div></div>`;
+  document.getElementById('rankBody').innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem;font-size:.78rem">${t('empty_ranking')}</td></tr>`;
+  document.getElementById('tokenCount').textContent='—'; setProgress(0);
+  ['creator','critic','synth','scorer','refiner','ranker'].forEach(a=>setAgentState(a,''));
+  ['bJSON','bCSV','bMD','bDOCX','bCopy'].forEach(id=>document.getElementById(id).disabled=true);
+  if(radarChart){radarChart.destroy();radarChart=null;}
+}
+
+// ═══════════════════════════════════════════════════════
+// OPENAI API — with streaming
+// ═══════════════════════════════════════════════════════
+async function callGPT(apiKey, systemPrompt, userPrompt, agentId='', stream=true){
+  const body={ model:'gpt-4o-mini', temperature:0.85, max_tokens:1200,
+    stream, messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}] };
+  const r=await fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok){const e=await r.json(); throw new Error(e.error?.message||r.statusText);}
+
+  if(!stream){
+    const data=await r.json(); addTokens(data.usage?.total_tokens||0);
+    return data.choices[0].message.content.trim();
+  }
+  // streaming
+  const reader=r.body.getReader(); const dec=new TextDecoder();
+  let full=''; let tok=0;
+  while(true){
+    const {done,value}=await reader.read(); if(done) break;
+    const chunk=dec.decode(value,{stream:true});
+    for(const line of chunk.split('\n')){
+      const l=line.trim();
+      if(!l||l==='data: [DONE]') continue;
+      if(!l.startsWith('data:')) continue;
+      try{
+        const obj=JSON.parse(l.slice(5));
+        const delta=obj.choices?.[0]?.delta?.content||'';
+        if(delta){ full+=delta; tok++; log(`<span class="ag">[${agentId}]</span> ${escHtml(full.slice(-280))}`,true); }
+      }catch(e){}
+    }
+  }
+  addTokens(tok*1.3|0);
+  logFlush(`<span class="ag">[${agentId}]</span> ${escHtml(full.slice(0,320))}${full.length>320?'…':''}`);
+  return full.trim();
+}
+
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ═══════════════════════════════════════════════════════
+// PARSERS
+// ═══════════════════════════════════════════════════════
+function parseIdeas(text){
+  const ideas=[];
+  const blocks=text.split(/---+|\n##\s+/).filter(b=>b.trim().length>20);
+  for(const block of blocks){
+    const lines=block.trim().split('\n').filter(l=>l.trim());
+    const title=(lines[0]||'Idea').replace(/^[*_#\d.:\s-]+/,'').replace(/[*_]+$/,'').trim().slice(0,100)||'Idea';
+    const desc=lines.slice(1).join(' ').trim().slice(0,400)||block.slice(0,250);
+    ideas.push({title,description:desc});
+  }
+  return ideas.length?ideas:[{title:'Idea',description:text.slice(0,250)}];
+}
+function parseScores(text){
+  const sk=t('score_keys');
+  const scores={};
+  sk.forEach(k=>{
+    const m=text.match(new RegExp(k+'[^\\d]*(\\d+(?:\\.\\d+)?)','i'));
+    scores[k]=m?parseFloat(m[1]):7;
+  });
+  return scores;
+}
+function avgScores(scores){
+  const vals=Object.values(scores);
+  return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════
+let allIdeas=[];
+let radarChart=null;
+
+function renderIdeaCard(idea){
+  const grid=document.getElementById('ideasGrid');
+  if(grid.querySelector('.empty-state')) grid.innerHTML='';
+  const scoreHTML=idea.scores?Object.entries(idea.scores).map(([k,v])=>
+    `<div class="score-pill"><span class="sl">${k.slice(0,3)}</span><span class="sv">${v}</span></div>`).join(''):'';
+  const avg=idea.scores?avgScores(idea.scores).toFixed(1):'—';
+  const card=document.createElement('div');
+  card.className='idea-card'+(idea.winner?' winner-badge':'');
+  card.innerHTML=`<div class="meta"><span>R${idea.round}</span><span>·</span><span>⌀ ${avg}</span></div>
+    <h3>${escHtml(idea.title)}</h3><p>${escHtml((idea.description||'').slice(0,220))}${(idea.description||'').length>220?'…':''}</p>
+    ${scoreHTML?`<div class="scores-mini">${scoreHTML}</div>`:''}`;
+  grid.appendChild(card);
+}
+function renderAllIdeas(){
+  document.getElementById('ideasGrid').innerHTML='';
+  if(!allIdeas.length){document.getElementById('ideasGrid').innerHTML=`<div class="empty-state" style="grid-column:1/-1"><div class="icon">💡</div><div>${t('empty_ideas')}</div></div>`;return;}
+  allIdeas.forEach(i=>renderIdeaCard(i));
+}
+function renderRanking(){
+  const sorted=[...allIdeas].filter(i=>i.scores).sort((a,b)=>avgScores(b.scores)-avgScores(a.scores));
+  const body=document.getElementById('rankBody');
+  if(!sorted.length){body.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem;font-size:.78rem">${t('empty_ranking')}</td></tr>`;return;}
+  const sk=t('score_keys');
+  body.innerHTML=sorted.map((idea,i)=>{
+    const avg=avgScores(idea.scores);
+    const barPct=Math.round(avg*10);
+    return `<tr>
+      <td class="rank-num">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)}</td>
+      <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(idea.title)}">${escHtml(idea.title.slice(0,40))}</td>
+      <td>${idea.scores[sk[0]]??'—'}</td>
+      <td>${idea.scores[sk[1]]??'—'}</td>
+      <td>${idea.scores[sk[2]]??'—'}</td>
+      <td>${idea.scores[sk[3]]??'—'}</td>
+      <td><div style="display:flex;align-items:center;gap:.5rem"><span style="font-family:var(--mono);color:var(--accent2)">${avg.toFixed(1)}</span><div class="rank-bar"><div class="rank-bar-fill" style="width:${barPct}%"></div></div></div></td>
+      <td><button class="btn-export" style="padding:.25rem .5rem;font-size:.65rem" onclick="copyIdea(${allIdeas.indexOf(idea)})">📋</button></td>
+    </tr>`;
+  }).join('');
+}
+function updateRadar(){
+  const sk=t('score_keys');
+  const ideas=allIdeas.filter(i=>i.scores);
+  const avgs=sk.map(k=>{
+    const vals=ideas.map(i=>i.scores[k]||0);
+    return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
+  });
+  const ctx=document.getElementById('radarChart').getContext('2d');
+  if(radarChart) radarChart.destroy();
+  radarChart=new Chart(ctx,{
+    type:'radar',
+    data:{labels:sk,datasets:[{label:t('radar_title'),data:avgs,fill:true,
+      backgroundColor:'rgba(108,99,255,.2)',borderColor:'rgba(108,99,255,.9)',
+      pointBackgroundColor:'#00d4aa',pointBorderColor:'#00d4aa',pointRadius:4}]},
+    options:{responsive:true,scales:{r:{min:0,max:10,
+      ticks:{color:'#7a8099',stepSize:2,backdropColor:'transparent'},
+      grid:{color:'#252a38'},pointLabels:{color:'#e8eaf0',font:{size:11}}}},
+      plugins:{legend:{labels:{color:'#7a8099',font:{size:11}}}}}
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// MAIN PIPELINE
+// ═══════════════════════════════════════════════════════
+let isRunning=false;
+async function runGenia(){
+  if(isRunning) return;
+  const apiKey=document.getElementById('apiKey').value.trim();
+  const problem=document.getElementById('problem').value.trim();
+  const domain=document.getElementById('domain').value.trim();
+  const audience=document.getElementById('audience').value.trim();
+  const rounds=parseInt(document.getElementById('rounds').value);
+  const ideasN=parseInt(document.getElementById('ideasN').value);
+
+  if(!apiKey){ log(`<span class="er">⚠ ${lang==='en'?'Enter your OpenAI API Key':lang==='val'?'Introdueix la clau API':'Introduce tu API Key de OpenAI'}</span>`); return; }
+  if(!problem){ log(`<span class="er">⚠ ${lang==='en'?'Describe the problem':'Describe el problema'}</span>`); return; }
+
+  isRunning=true; allIdeas=[]; totalTokens=0;
+  document.getElementById('streamPanel').innerHTML='';
+  document.getElementById('ideasGrid').innerHTML='';
+  document.getElementById('btnRun').disabled=true;
+  document.getElementById('btnLabel').textContent=lang==='en'?'Running…':lang==='val'?'Executant…':'Generando…';
+  document.getElementById('btnIcon').textContent='⏳';
+  ['bJSON','bCSV','bMD','bDOCX','bCopy'].forEach(id=>document.getElementById(id).disabled=true);
+  ['creator','critic','synth','scorer','refiner','ranker'].forEach(a=>setAgentState(a,''));
+
+  const totalSteps=rounds*5+1; let step=0;
+  const tick=()=>setProgress(Math.round(++step/totalSteps*100));
+
+  try{
+    log(`<span class="ph">════ Tormenta Ideas v2 · ${new Date().toLocaleString()} ════</span>`);
+    log(`${lang==='en'?'Problem':'Problema'}: <em>${escHtml(problem)}</em>`);
+    if(domain) log(`${lang==='en'?'Domain':'Dominio'}: ${escHtml(domain)}`);
+    if(audience) log(`${lang==='en'?'Audience':'Audiencia'}: ${escHtml(audience)}`);
+    log(`${lang==='en'?'Rounds':'Rondas'}: ${rounds} · Ideas/ronda: ${ideasN}\n`);
+
+    let context='';
+    const ap=agentPrompts;
+
+    for(let r=1;r<=rounds;r++){
+      log(`\n<span class="ph">── ${lang==='en'?'Round':'Ronda'} ${r}/${rounds} ──────────────────</span>`);
+
+      // CREATOR
+      setAgentState('creator','working');
+      log(`\n<span class="ag">[${lang==='en'?'Creator':lang==='val'?'Creador':'Creador'}]</span> ${lang==='en'?'Generating':'Generando'} ${ideasN} ${lang==='en'?'ideas':'ideas'}…`);
+      const prevCtx=context?`\nPrevious ideas (avoid repeating): ${context.slice(-500)}`:'';
+      const creatorOut=await callGPT(apiKey,ap.creator,
+        `Problem: ${problem}\nDomain: ${domain||'General'}\nAudience: ${audience||'General'}\nGenerate exactly ${ideasN} innovative ideas.${prevCtx}`,'Creator');
+      setAgentState('creator','active'); tick();
+
+      // CRITIC
+      setAgentState('critic','working');
+      log(`\n<span class="ag">[${lang==='en'?'Critic':lang==='val'?'Crític':'Crítico'}]</span> ${lang==='en'?'Analysing weaknesses':'Analizando debilidades'}…`);
+      const criticOut=await callGPT(apiKey,ap.critic,`Ideas:\n${creatorOut}\n\nOriginal problem: ${problem}`,'Critic');
+      setAgentState('critic','active'); tick();
+
+      // SYNTH
+      setAgentState('synth','working');
+      log(`\n<span class="ag">[${lang==='en'?'Synthesiser':lang==='val'?'Sintetitzador':'Sintetizador'}]</span> ${lang==='en'?'Synthesising':'Sintetizando'}…`);
+      const synthOut=await callGPT(apiKey,ap.synth,`Original ideas:\n${creatorOut}\n\nCritiques:\n${criticOut}`,'Synth');
+      setAgentState('synth','active'); tick();
+
+      // SCORER
+      setAgentState('scorer','working');
+      log(`\n<span class="ag">[${lang==='en'?'Evaluator':lang==='val'?'Avaluador':'Evaluador'}]</span> ${lang==='en'?'Scoring':'Puntuando'}…`);
+      const scorerOut=await callGPT(apiKey,ap.scorer,`Score these ideas:\n${synthOut}`,'Scorer',false);
+      log(`<span class="sc">${escHtml(scorerOut.slice(0,200))}</span>`);
+      setAgentState('scorer','active'); tick();
+
+      // REFINER
+      setAgentState('refiner','working');
+      log(`\n<span class="ag">[${lang==='en'?'Refiner':lang==='val'?'Refinador':'Refinador'}]</span> ${lang==='en'?'Refining best idea':'Refinando mejor idea'}…`);
+      const refinerOut=await callGPT(apiKey,ap.refiner,`Ideas:\n${synthOut}\n\nScores:\n${scorerOut}`,'Refiner');
+      setAgentState('refiner','active'); tick();
+
+      // parse & store
+      const parsed=parseIdeas(synthOut);
+      const scores=parseScores(scorerOut);
+      parsed.forEach(idea=>{
+        idea.scores={...scores}; idea.round=r; idea.refined=refinerOut;
+        allIdeas.push(idea); renderIdeaCard(idea);
+      });
+      context+='\n'+synthOut;
+      log(`\n<span class="ok">✓ ${lang==='en'?'Round':'Ronda'} ${r} — ${parsed.length} ${lang==='en'?'ideas':'ideas'}</span>`);
+    }
+
+    // RANKER
+    setAgentState('ranker','working');
+    log(`\n<span class="ph">── ${lang==='en'?'Final ranking':'Ranking final'} ────────────────</span>`);
+    const allText=allIdeas.map((i,n)=>`${n+1}. ${i.title}: ${i.description}`).join('\n');
+    const rankerOut=await callGPT(apiKey,ap.ranker,`All ideas:\n${allText}\n\nProblem: ${problem}`,'Ranker',false);
+    setAgentState('ranker','active');
+    log(`\n<span class="sc">🏆 ${escHtml(rankerOut)}</span>`);
+
+    // mark winner
+    const winLine=rankerOut.toLowerCase();
+    allIdeas.forEach(i=>{ i.winner=winLine.includes(i.title.toLowerCase().slice(0,15)); });
+
+    setProgress(100);
+    renderRanking(); updateRadar();
+    log(`\n<span class="ok">════ Tormenta Ideas ${lang==='en'?'complete':'finalizado'} · ${allIdeas.length} ${lang==='en'?'ideas':'ideas'} · ${totalTokens.toLocaleString()} tokens ════</span>`);
+
+    ['bJSON','bCSV','bMD','bDOCX','bCopy'].forEach(id=>document.getElementById(id).disabled=false);
+
+    // save to IndexedDB
+    await saveSession({problem,ideas:allIdeas,ts:Date.now()}).catch(e=>console.warn('Save failed',e));
+
+  }catch(err){
+    log(`\n<span class="er">ERROR: ${escHtml(err.message)}</span>`);
+    console.error(err);
+  } finally {
+    isRunning=false;
+    document.getElementById('btnRun').disabled=false;
+    document.getElementById('btnLabel').textContent=t('btn_start');
+    document.getElementById('btnIcon').textContent='▶';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// EXPORTS
+// ═══════════════════════════════════════════════════════
+function exportJSON(){
+  dl(JSON.stringify(allIdeas,null,2),'application/json','TormentaIdeas.json');
+}
+function exportCSV(){
+  const sk=t('score_keys');
+  const header=['Ronda','Título','Descripción',...sk,'Media'].join(';');
+  const rows=allIdeas.map(i=>[
+    i.round,`"${i.title}"`,`"${(i.description||'').replace(/"/g,'""')}"`,
+    ...sk.map(k=>i.scores?.[k]??''),
+    i.scores?avgScores(i.scores).toFixed(2):''
+  ].join(';'));
+  dl([header,...rows].join('\n'),'text/csv;charset=utf-8','TormentaIdeas.csv');
+}
+function exportMD(){
+  const sk=t('score_keys');
+  let md=`# Tormenta Ideas · ${document.getElementById('problem').value||'Ideas'}\n\n`;
+  md+=`> ${new Date().toLocaleDateString()} · gpt-4o-mini · ${allIdeas.length} ideas\n\n`;
+  for(const idea of allIdeas){
+    md+=`## R${idea.round} · ${idea.title}\n\n${idea.description}\n\n`;
+    if(idea.scores) md+=sk.map(k=>`- **${k}**: ${idea.scores[k]}/10`).join('\n')+'\n\n';
+    if(idea.refined) md+=`### Refinamiento\n\n${idea.refined}\n\n`;
+    md+='---\n\n';
+  }
+  dl(md,'text/markdown','TormentaIdeas.md');
+}
+
+async function exportDOCX(){
+  const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,
+         HeadingLevel,AlignmentType,WidthType,BorderStyle,ShadingType,LevelFormat}=docx;
+
+  const sk=t('score_keys');
+  const problem=document.getElementById('problem').value||'—';
+  const border={style:BorderStyle.SINGLE,size:1,color:'CCCCCC'};
+  const borders={top:border,bottom:border,left:border,right:border};
+  const cellM={top:80,bottom:80,left:120,right:120};
+
+  const children=[];
+  // Title
+  children.push(new Paragraph({heading:HeadingLevel.HEADING_1,children:[new TextRun({text:'Tormenta Ideas · Informe de Ideas',bold:true,size:32,font:'Arial'})]}));
+  children.push(new Paragraph({children:[new TextRun({text:`Problema: ${problem}`,size:22,color:'555555',font:'Arial'})],spacing:{after:200}}));
+  children.push(new Paragraph({children:[new TextRun({text:`Generado: ${new Date().toLocaleString()} · gpt-4o-mini · ${allIdeas.length} ideas`,size:18,color:'888888',font:'Arial'})],spacing:{after:400}}));
+
+  // Ranking table
+  children.push(new Paragraph({heading:HeadingLevel.HEADING_2,children:[new TextRun({text:'Tabla de Ranking',font:'Arial',size:26,bold:true})],spacing:{before:300,after:200}}));
+  const sorted=[...allIdeas].filter(i=>i.scores).sort((a,b)=>avgScores(b.scores)-avgScores(a.scores));
+
+  const headerCells=['#','Título',...sk.slice(0,4),'Media'].map((h,ci)=>
+    new TableCell({borders,margins:cellM,width:{size:[400,2800,700,700,700,700,700][ci]||700,type:WidthType.DXA},
+      shading:{fill:'4F46E5',type:ShadingType.CLEAR},
+      children:[new Paragraph({children:[new TextRun({text:h,bold:true,color:'FFFFFF',font:'Arial',size:18})],alignment:AlignmentType.CENTER})]}));
+  const tableRows=[new TableRow({children:headerCells,tableHeader:true})];
+  sorted.forEach((idea,i)=>{
+    const avg=avgScores(idea.scores).toFixed(1);
+    const cells=[`${i+1}`,idea.title.slice(0,35),...sk.slice(0,4).map(k=>String(idea.scores[k]??'—')),avg];
+    const widths=[400,2800,700,700,700,700,700];
+    tableRows.push(new TableRow({children:cells.map((c,ci)=>new TableCell({borders,margins:cellM,
+      width:{size:widths[ci],type:WidthType.DXA},
+      shading:{fill:i%2===0?'F8F8FF':'FFFFFF',type:ShadingType.CLEAR},
+      children:[new Paragraph({children:[new TextRun({text:c,font:'Arial',size:18})],alignment:ci>1?AlignmentType.CENTER:AlignmentType.LEFT})]}))}));
+  });
+  children.push(new Table({width:{size:7700,type:WidthType.DXA},columnWidths:[400,2800,700,700,700,700,700],rows:tableRows}));
+  children.push(new Paragraph({spacing:{after:400}}));
+
+  // Idea detail cards
+  children.push(new Paragraph({heading:HeadingLevel.HEADING_2,children:[new TextRun({text:'Detalle de Ideas',font:'Arial',size:26,bold:true})],spacing:{before:300,after:200}}));
+  allIdeas.forEach((idea,idx)=>{
+    children.push(new Paragraph({heading:HeadingLevel.HEADING_2,children:[new TextRun({text:`${idx+1}. ${idea.title}`,font:'Arial',size:24,bold:true,color:'4F46E5'})],spacing:{before:280,after:120}}));
+    children.push(new Paragraph({children:[new TextRun({text:`Ronda ${idea.round}${idea.winner?' · 🏆 GANADORA':''}`,font:'Arial',size:18,color:'888888'})],spacing:{after:80}}));
+    children.push(new Paragraph({children:[new TextRun({text:idea.description||'',font:'Arial',size:20})],spacing:{after:120}}));
+    if(idea.scores){
+      children.push(new Paragraph({children:[new TextRun({text:'Puntuaciones',font:'Arial',size:20,bold:true})],spacing:{after:80}}));
+      sk.forEach(k=>{
+        children.push(new Paragraph({children:[new TextRun({text:`${k}: ${idea.scores[k]}/10`,font:'Arial',size:18})],spacing:{after:40}}));
+      });
+    }
+    if(idea.refined){
+      children.push(new Paragraph({children:[new TextRun({text:'Refinamiento:',font:'Arial',size:20,bold:true})],spacing:{before:120,after:60}}));
+      children.push(new Paragraph({children:[new TextRun({text:idea.refined,font:'Arial',size:18,color:'444444'})],spacing:{after:160}}));
+    }
+  });
+
+  const doc=new Document({
+    styles:{default:{document:{run:{font:'Arial',size:22}}}},
+    sections:[{
+      properties:{page:{size:{width:11906,height:16838},margin:{top:1440,right:1200,bottom:1440,left:1200}}},
+      children
+    }]
+  });
+  const buf=await Packer.toBlob(doc);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(buf);
+  a.download='TormentaIdeas_informe.docx'; a.click();
+}
+
+function copyIdea(idx){
+  const i=allIdeas[idx]; if(!i) return;
+  const sk=t('score_keys');
+  const text=`${i.title}\n${i.description}\n${i.scores?sk.map(k=>`${k}: ${i.scores[k]}`).join(' · '):''}`;
+  navigator.clipboard.writeText(text);
+}
+function copyAll(){
+  const text=allIdeas.map(i=>`[R${i.round}] ${i.title}\n${i.description}`).join('\n\n---\n\n');
+  navigator.clipboard.writeText(text).then(()=>{
+    const b=document.getElementById('bCopy'); b.textContent='✓'; setTimeout(()=>b.innerHTML=`📋 <span>${t('btn_copy')}</span>`,1500);
+  });
+}
+function dl(content,mime,filename){
+  const blob=new Blob([content],{type:mime});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=filename; a.click();
+}
+</script>
+</body>
+</html>
