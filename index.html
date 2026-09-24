@@ -1,6 +1,64 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<script id="gpt6-luna-shim">
+/* gpt-6-luna: modelo por defecto con temperatura=1 (actualización sep-2026).
+   Adapta las peticiones a la API de OpenAI para la familia gpt-6:
+   temperature=1, max_tokens -> max_completion_tokens (con margen para razonamiento)
+   y reintento automático si la API rechaza algún parámetro. */
+(function(){
+  var NEW='gpt-6-luna', OLD='gpt-4o-mini';
+  try{
+    if(!localStorage.getItem('__gpt6_luna_mig_v1')){
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i), v=localStorage.getItem(k);
+        if(v===OLD||v==='"'+OLD+'"'){ localStorage.setItem(k, v.replace(OLD,NEW)); continue; }
+        if(v && v.length<20000 && v.charAt(0)==='{' && v.indexOf(OLD)>=0){
+          try{ var o=JSON.parse(v), ch=false;
+            for(var p in o){ if(o[p]===OLD){ o[p]=NEW; ch=true; } }
+            if(ch) localStorage.setItem(k, JSON.stringify(o));
+          }catch(e){}
+        }
+      }
+      localStorage.setItem('__gpt6_luna_mig_v1','1');
+    }
+  }catch(e){}
+  var of=window.fetch; if(!of) return;
+  function adapt(url,b){
+    if(!b || typeof b.model!=='string' || !/^gpt-6/.test(b.model)) return false;
+    b.temperature=1;
+    ['top_p','frequency_penalty','presence_penalty','logit_bias','logprobs','top_logprobs'].forEach(function(p){ delete b[p]; });
+    if(/chat\/completions/.test(url) && b.max_tokens!=null){
+      if(b.max_completion_tokens==null) b.max_completion_tokens=Math.min(128000, (+b.max_tokens||0)+6000);
+      delete b.max_tokens;
+    }
+    return true;
+  }
+  window.fetch=function(input,init){
+    var url=typeof input==='string'?input:(input&&input.url)||'';
+    if(!/api\.openai\.com\/v1\/(chat\/completions|responses)/.test(url) || !init || typeof init.body!=='string') return of.apply(this,arguments);
+    var b; try{ b=JSON.parse(init.body); }catch(e){ return of.apply(this,arguments); }
+    if(!adapt(url,b)) return of.apply(this,arguments);
+    var self=this, tries=0;
+    function go(){
+      var ini=Object.assign({},init,{body:JSON.stringify(b)});
+      return of.call(self,input,ini).then(function(r){
+        if(r.status!==400 || tries>=3) return r;
+        return r.clone().json().then(function(j){
+          var err=(j&&j.error)||{}, p=err.param, msg=String(err.message||'');
+          if(!p){ var m=msg.match(/'([a-z_]+)'/); if(m) p=m[1]; }
+          if(p && b.hasOwnProperty(p) && /unsupported|not supported|does not support|only the default/i.test(msg)){
+            delete b[p]; tries++; return go();
+          }
+          return r;
+        },function(){ return r; });
+      });
+    }
+    return go();
+  };
+})();
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tormenta Ideas · Agente de Ideación Autónomo</title>
@@ -184,7 +242,7 @@ main{display:flex;flex-direction:column;overflow:hidden;}
       <button class="lang-btn" onclick="setLang('en')">EN</button>
       <button class="lang-btn" onclick="setLang('val')">VAL</button>
     </div>
-    <span class="badge">gpt-4o-mini</span>
+    <span class="badge">gpt-6-luna</span>
   </div>
 </header>
 
@@ -329,7 +387,7 @@ main{display:flex;flex-direction:column;overflow:hidden;}
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h3 id="modalTitle">Editar agente</h3>
-    <div style="font-size:.72rem;color:var(--muted);margin-bottom:.25rem" data-i18n="modal_hint">System prompt enviado a gpt-4o-mini para este agente.</div>
+    <div style="font-size:.72rem;color:var(--muted);margin-bottom:.25rem" data-i18n="modal_hint">System prompt enviado a gpt-6-luna para este agente.</div>
     <textarea id="modalPrompt"></textarea>
     <div class="modal-btns">
       <button class="btn-sm" onclick="closeModal()" data-i18n="btn_cancel">Cancelar</button>
@@ -363,7 +421,7 @@ const LANGS = {
     empty_ideas:'Las ideas aparecerán aquí',empty_ranking:'Sin datos aún',
     radar_title:'Puntuación media de todas las ideas',
     col_title:'Título',col_quality:'Calidad',col_orig:'Original.',col_pract:'Práct.',col_impact:'Impacto',col_avg:'Media',
-    modal_hint:'System prompt enviado a gpt-4o-mini para este agente.',
+    modal_hint:'System prompt enviado a gpt-6-luna para este agente.',
     btn_cancel:'Cancelar',btn_save:'Guardar',btn_copy:'Copiar',
     score_keys:['Calidad','Originalidad','Practicidad','Impacto','Alineamiento','Estética'],
   },
@@ -387,7 +445,7 @@ const LANGS = {
     empty_ideas:'Ideas will appear here',empty_ranking:'No data yet',
     radar_title:'Average score of all ideas',
     col_title:'Title',col_quality:'Quality',col_orig:'Originality',col_pract:'Practicality',col_impact:'Impact',col_avg:'Average',
-    modal_hint:'System prompt sent to gpt-4o-mini for this agent.',
+    modal_hint:'System prompt sent to gpt-6-luna for this agent.',
     btn_cancel:'Cancel',btn_save:'Save',btn_copy:'Copy',
     score_keys:['Quality','Originality','Practicality','Impact','Alignment','Aesthetics'],
   },
@@ -411,7 +469,7 @@ const LANGS = {
     empty_ideas:'Les idees apareixeran aquí',empty_ranking:'Sense dades encara',
     radar_title:'Puntuació mitjana de totes les idees',
     col_title:'Títol',col_quality:'Qualitat',col_orig:'Original.',col_pract:'Pràct.',col_impact:'Impacte',col_avg:'Mitjana',
-    modal_hint:'System prompt enviat a gpt-4o-mini per a aquest agent.',
+    modal_hint:'System prompt enviat a gpt-6-luna per a aquest agent.',
     btn_cancel:'Cancel·lar',btn_save:'Guardar',btn_copy:'Copiar',
     score_keys:['Qualitat','Originalitat','Practicitat','Impacte','Alineament','Estètica'],
   }
@@ -652,7 +710,7 @@ function resetAll(){
 // OPENAI API — with streaming
 // ═══════════════════════════════════════════════════════
 async function callGPT(apiKey, systemPrompt, userPrompt, agentId='', stream=true){
-  const body={ model:'gpt-4o-mini', temperature:0.85, max_tokens:1200,
+  const body={ model:'gpt-6-luna', temperature:0.85, max_tokens:1200,
     stream, messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}] };
   const r=await fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
@@ -917,7 +975,7 @@ function exportCSV(){
 function exportMD(){
   const sk=t('score_keys');
   let md=`# Tormenta Ideas · ${document.getElementById('problem').value||'Ideas'}\n\n`;
-  md+=`> ${new Date().toLocaleDateString()} · gpt-4o-mini · ${allIdeas.length} ideas\n\n`;
+  md+=`> ${new Date().toLocaleDateString()} · gpt-6-luna · ${allIdeas.length} ideas\n\n`;
   for(const idea of allIdeas){
     md+=`## R${idea.round} · ${idea.title}\n\n${idea.description}\n\n`;
     if(idea.scores) md+=sk.map(k=>`- **${k}**: ${idea.scores[k]}/10`).join('\n')+'\n\n';
@@ -941,7 +999,7 @@ async function exportDOCX(){
   // Title
   children.push(new Paragraph({heading:HeadingLevel.HEADING_1,children:[new TextRun({text:'Tormenta Ideas · Informe de Ideas',bold:true,size:32,font:'Arial'})]}));
   children.push(new Paragraph({children:[new TextRun({text:`Problema: ${problem}`,size:22,color:'555555',font:'Arial'})],spacing:{after:200}}));
-  children.push(new Paragraph({children:[new TextRun({text:`Generado: ${new Date().toLocaleString()} · gpt-4o-mini · ${allIdeas.length} ideas`,size:18,color:'888888',font:'Arial'})],spacing:{after:400}}));
+  children.push(new Paragraph({children:[new TextRun({text:`Generado: ${new Date().toLocaleString()} · gpt-6-luna · ${allIdeas.length} ideas`,size:18,color:'888888',font:'Arial'})],spacing:{after:400}}));
 
   // Ranking table
   children.push(new Paragraph({heading:HeadingLevel.HEADING_2,children:[new TextRun({text:'Tabla de Ranking',font:'Arial',size:26,bold:true})],spacing:{before:300,after:200}}));
